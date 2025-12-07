@@ -16,3 +16,11 @@ spring:
 backend:
   url: "http://localhost:8081/payments"
 
+proxy:
+  concurrency:
+    start: 64
+    max: 128
+    unpause-delay: 200
+    busy-wait-interval: 20
+    modifiable-interval: 30000
+
