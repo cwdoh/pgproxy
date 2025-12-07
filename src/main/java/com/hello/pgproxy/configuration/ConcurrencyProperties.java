@@ -12,5 +12,7 @@ public class ConcurrencyProperties {
     private int max;
     private long unpauseDelay;
     private long busyWaitInterval;
-    private long modifiableInterval;
+    private long scaleUpInterval;
+    private long scaleDownInterval;
+    private String backpressureHandler;
 }

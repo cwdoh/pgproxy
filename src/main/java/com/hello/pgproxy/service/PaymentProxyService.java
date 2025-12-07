@@ -5,6 +5,7 @@ import com.hello.pgproxy.configuration.ConcurrencyProperties;
 import com.hello.pgproxy.model.BackendRequest;
 import com.hello.pgproxy.model.ClientRequest;
 import com.hello.pgproxy.model.PrioritizedTask;
+import com.hello.pgproxy.service.backpressure.BackpressureHandler;
 import com.hello.pgproxy.service.verification.VerificationStrategy;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.context.request.async.DeferredResult;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -31,24 +33,29 @@ public class PaymentProxyService {
     private final BackendApiClient backendApiClient;
     private final VerificationStrategy verificationStrategy;
     private final ConcurrencyProperties  concurrencyProperties;
+    private final List<BackpressureHandler> backpressureHandlers;
 
     private final PriorityBlockingQueue<PrioritizedTask> queue = new PriorityBlockingQueue<>();
-    private final ExecutorService workerPool = Executors.newCachedThreadPool();
+    private final ExecutorService enqueueWorkPool = Executors.newCachedThreadPool();
+    private final ExecutorService backendWorkPool = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicInteger activeRequests = new AtomicInteger(0);
 
     private int currentConcurrencyLimit = 16;
     private volatile boolean isPaused = false;
     private Instant concurrencyChangeTimestamp = Instant.now();
+    private BackpressureHandler activeBackpressureHandler;
 
     @PostConstruct
     public void init() {
         currentConcurrencyLimit = concurrencyProperties.getStart();
+        activeBackpressureHandler = getActiveBackpressureHandler();
     }
 
     public void enqueue(ClientRequest request, DeferredResult<ResponseEntity<?>> deferredResult) {
-        final Long verification = verificationStrategy.calculate(request);
-
-        queue.add(new PrioritizedTask(request, verification, deferredResult));
+        enqueueWorkPool.submit(() -> {
+            final Long verification = verificationStrategy.calculate(request);
+            queue.add(new PrioritizedTask(request, verification, deferredResult));
+        });
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -74,7 +81,7 @@ public class PaymentProxyService {
         PrioritizedTask task = queue.take();
 
         activeRequests.incrementAndGet();
-        workerPool.submit(() -> executeTask(task));
+        backendWorkPool.submit(() -> executeTask(task));
     }
 
     private void executeTask(PrioritizedTask task) {
@@ -89,8 +96,10 @@ public class PaymentProxyService {
             final ResponseEntity<String> response = backendApiClient.postForEntity(body);
 
             // If backend is healthy, increase capacity
-            if (currentConcurrencyLimit < concurrencyProperties.getMax() && hasConcurrencyModifiableTimePassed()) {
-                currentConcurrencyLimit = Math.min(currentConcurrencyLimit + 1, concurrencyProperties.getMax());
+            if (currentConcurrencyLimit < concurrencyProperties.getMax()
+                    && hasConcurrencyModifiableTimePassed(concurrencyProperties.getScaleUpInterval())
+            ) {
+                currentConcurrencyLimit = activeBackpressureHandler.getScaleUpConcurrency(currentConcurrencyLimit);
                 concurrencyChangeTimestamp = Instant.now();
             }
 
@@ -112,11 +121,13 @@ public class PaymentProxyService {
     }
 
     private synchronized void handleBackpressure(PrioritizedTask failedTask) {
-        int old = currentConcurrencyLimit;
-        currentConcurrencyLimit = Math.max(1, currentConcurrencyLimit / 2);
-        concurrencyChangeTimestamp = Instant.now();
+        if (hasConcurrencyModifiableTimePassed(concurrencyProperties.getScaleDownInterval())) {
+            int old = currentConcurrencyLimit;
+            currentConcurrencyLimit = activeBackpressureHandler.getScaleDownConcurrency(currentConcurrencyLimit);
+            concurrencyChangeTimestamp = Instant.now();
 
-        log.info("Backpressure control: Got 503 from backend. Concurrency {} -> {}", old, currentConcurrencyLimit);
+            log.info("Backpressure control: Got 503 from backend. Concurrency {} -> {}", old, currentConcurrencyLimit);
+        }
 
         // Re-queue the failed task
         queue.add(failedTask);
@@ -130,9 +141,18 @@ public class PaymentProxyService {
         }
     }
 
-    private boolean hasConcurrencyModifiableTimePassed() {
-        Instant targetTime = concurrencyChangeTimestamp.plusMillis(concurrencyProperties.getModifiableInterval());
+    private boolean hasConcurrencyModifiableTimePassed(long givenInterval) {
+        Instant targetTime = concurrencyChangeTimestamp.plusMillis(givenInterval);
 
-        return !Instant.now().isBefore(targetTime);
+        return Instant.now().isAfter(targetTime);
+    }
+
+    private BackpressureHandler getActiveBackpressureHandler() {
+        final String handlerName = concurrencyProperties.getBackpressureHandler();
+
+        return backpressureHandlers.stream()
+                .filter(handler -> handlerName.equals(handler.getHandlerName()))
+                .findFirst()
+                .orElseThrow();
     }
 }
