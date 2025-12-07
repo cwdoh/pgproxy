@@ -24,3 +24,5 @@ proxy:
     busy-wait-interval: 20
     modifiable-interval: 30000
 
+response:
+  timeout: 30000

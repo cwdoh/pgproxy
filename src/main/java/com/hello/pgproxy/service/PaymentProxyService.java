@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.context.request.async.DeferredResult;
 
 import java.time.Instant;
 import java.util.concurrent.*;
@@ -44,10 +45,10 @@ public class PaymentProxyService {
         currentConcurrencyLimit = concurrencyProperties.getStart();
     }
 
-    public void enqueue(ClientRequest request) {
+    public void enqueue(ClientRequest request, DeferredResult<ResponseEntity<?>> deferredResult) {
         final Long verification = verificationStrategy.calculate(request);
 
-        queue.add(new PrioritizedTask(request, verification));
+        queue.add(new PrioritizedTask(request, verification, deferredResult));
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -92,11 +93,19 @@ public class PaymentProxyService {
                 currentConcurrencyLimit = Math.min(currentConcurrencyLimit + 1, concurrencyProperties.getMax());
                 concurrencyChangeTimestamp = Instant.now();
             }
+
+            task.getDeferredResponse().setResult(response);
         } catch (HttpServerErrorException.ServiceUnavailable e) {
             handleBackpressure(task);
         } catch (HttpClientErrorException e) {
             // Client Error (400) - Pass through to client
+            task.getDeferredResponse().setResult(
+                    ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString())
+            );
         } catch (Exception e) {
+            task.getDeferredResponse().setResult(
+                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
+            );
         } finally {
             activeRequests.decrementAndGet();
         }
