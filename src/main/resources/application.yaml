@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: Payment Gateway Proxy
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
