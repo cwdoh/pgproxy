@@ -7,3 +7,12 @@ management:
     health:
       show-details: never
 
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+backend:
+  url: "http://localhost:8081/payments"
+
