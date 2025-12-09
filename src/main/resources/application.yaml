@@ -21,12 +21,11 @@ backend:
 
 proxy:
   concurrency:
-    start: 2048
-    max: 65535
+    start: 64
+    max: 10000
     unpause-delay: 20
-    busy-wait-interval: 20
-    scale-up-interval: 50
-    scale-down-interval: 100
+    scale-up-interval: 500
+    scale-down-interval: 250
     backpressure-handler: simple
 
 response:
