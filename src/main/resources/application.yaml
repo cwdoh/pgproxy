@@ -10,6 +10,12 @@ management:
     health:
       show-details: never
 
+springdoc:
+  info:
+    title: Payment Proxy Gateway API
+    description: Simple & high-Throughput Proxy with Backpressure and Prioritization
+    version: ${VERSION}
+
 ---
 spring:
   config:
