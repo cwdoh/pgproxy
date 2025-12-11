@@ -95,7 +95,7 @@ public class PaymentProxyService {
                     .verification(task.getVerification())
                     .build();
 
-            final ResponseEntity<String> response = backendApiClient.postForEntity(body);
+            final ResponseEntity<?> response = backendApiClient.postForEntity(body);
 
             // If backend is healthy, increase capacity
             increaseConcurrencyLimit();

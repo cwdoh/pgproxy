@@ -15,7 +15,7 @@ public class BackendApiClient {
     private String backendUrl;
 
     // Forward to Backend
-    public ResponseEntity<String> postForEntity(BackendRequest request) {
+    public ResponseEntity<?> postForEntity(BackendRequest request) {
         return backendRestTemplate.postForEntity(backendUrl, request, String.class);
     }
 }
