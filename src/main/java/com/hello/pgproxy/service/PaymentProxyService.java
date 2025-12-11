@@ -40,16 +40,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class PaymentProxyService {
     private final BackendApiClient backendApiClient;
-    private final VerificationStrategy verificationStrategy;
     private final ConcurrencyProperties  concurrencyProperties;
     private final List<BackpressureHandler> backpressureHandlers;
+    private final PriorityTaskQueueService  priorityTaskQueueService;
 
-    // Thread-safe queue that orders payment requests
-    private final PriorityBlockingQueue<PrioritizedTask> queue = new PriorityBlockingQueue<>();
-
-    // Allocate the dedicate thread pool for cpu intensive works
-    private final int availableCores = Runtime.getRuntime().availableProcessors();
-    private final ExecutorService enqueueWorkPool = Executors.newFixedThreadPool(availableCores);
     // Allocate the dedicate thread pool for I/O works
     private final ExecutorService backendWorkPool = Executors.newVirtualThreadPerTaskExecutor();
     // Simple loop thead
@@ -66,13 +60,6 @@ public class PaymentProxyService {
     public void init() {
         currentConcurrencyLimit.set(concurrencyProperties.getStart());
         activeBackpressureHandler = getActiveBackpressureHandler();
-    }
-
-    public void enqueue(ClientRequest request, DeferredResult<ResponseEntity<?>> deferredResult) {
-        enqueueWorkPool.submit(() -> {
-            final Long verification = verificationStrategy.calculate(request);
-            queue.add(new PrioritizedTask(request, verification, deferredResult));
-        });
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -96,7 +83,7 @@ public class PaymentProxyService {
             }
         }
 
-        PrioritizedTask task = queue.take();
+        PrioritizedTask task = priorityTaskQueueService.take();
 
         activeRequests.incrementAndGet();
         backendWorkPool.submit(() -> executeTask(task));
@@ -159,7 +146,7 @@ public class PaymentProxyService {
         }
 
         // Re-queue the failed task
-        queue.add(failedTask);
+        priorityTaskQueueService.requeue(failedTask);
 
         if (!isPaused) {
             isPaused = true;

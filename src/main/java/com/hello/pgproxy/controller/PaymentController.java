@@ -2,10 +2,8 @@ package com.hello.pgproxy.controller;
 
 import com.hello.pgproxy.configuration.ResponseProperties;
 import com.hello.pgproxy.model.ClientRequest;
-import com.hello.pgproxy.service.PaymentProxyService;
+import com.hello.pgproxy.service.PriorityTaskQueueService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +18,7 @@ import org.springframework.web.context.request.async.DeferredResult;
 @RequiredArgsConstructor
 @Tag(name = "Payment Processing", description = "Endpoints for handling payment requests and managing backpressure.") // 컨트롤러 전체 태그
 public class PaymentController {
-    private final PaymentProxyService proxyService;
+    private final PriorityTaskQueueService priorityTaskQueueService;
     private final ResponseProperties responseProperties;
 
     @Operation(
@@ -48,7 +46,7 @@ public class PaymentController {
             return deferredResponse;
         }
 
-        proxyService.enqueue(request, deferredResponse);
+        priorityTaskQueueService.enqueue(request, deferredResponse);
 
         return deferredResponse;
     }

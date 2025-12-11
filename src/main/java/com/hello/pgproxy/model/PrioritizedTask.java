@@ -1,10 +1,12 @@
 package com.hello.pgproxy.model;
 
+import lombok.Builder;
 import lombok.Data;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.context.request.async.DeferredResult;
 
 @Data
+@Builder
 public class PrioritizedTask implements Comparable<PrioritizedTask> {
     private final ClientRequest request;
     // Recommend verification value here, because possibly computing verification re-arrange to the another spot.
