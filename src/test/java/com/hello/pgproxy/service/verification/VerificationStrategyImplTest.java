@@ -1,6 +1,7 @@
 package com.hello.pgproxy.service.verification;
 
 import com.hello.pgproxy.model.ClientRequest;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,49 +19,44 @@ class VerificationStrategyImplTest {
 
     private static final UUID KNOWN_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
     private static final long KNOWN_AMOUNT = 1000L;
-    private static final long KNOWN_VERIFICATION_NUMBER = 3579L;
+    private static final long KNOWN_VERIFICATION_NUMBER = 3579L; // Pre-calculated expected output
 
     @Test
+    @DisplayName("Calculate: Should find the known verification number for fixed input")
     void calculate_ShouldFindKnownVerificationNumber_ForFixedInput() {
-        // Given
         ClientRequest request = new ClientRequest(KNOWN_ID, KNOWN_AMOUNT);
 
-        // When
         long resultNumber = verificationStrategy.calculate(request);
 
-        // Then
+        // The result must exactly match the pre-computed known value
         assertEquals(KNOWN_VERIFICATION_NUMBER, resultNumber, "The verification number must match the pre-computed known value.");
     }
 
     @Test
+    @DisplayName("Calculate: Should return a different number when the Request ID changes")
     void calculate_ShouldFindDifferentNumber_WhenIdChanges() {
-        // Given
         ClientRequest originalRequest = new ClientRequest(KNOWN_ID, KNOWN_AMOUNT);
-        // different UUID
+        // Different UUID
         ClientRequest changedRequest = new ClientRequest(UUID.fromString("00000000-0000-0000-0000-000000000001"), KNOWN_AMOUNT);
 
-        // When
         long originalNumber = verificationStrategy.calculate(originalRequest);
         long changedNumber = verificationStrategy.calculate(changedRequest);
 
-        // Then
-        // The new number must NOT be the same as the original, proving the ID was used in the hash input.
+        // The new number must NOT be the same as the original
         assertNotEquals(originalNumber, changedNumber, "Changing the ID must change the verification number.");
     }
 
     @Test
+    @DisplayName("Calculate: Should return a different number when the Amount changes")
     void calculate_ShouldFindDifferentNumber_WhenAmountChanges() {
-        // Given
         ClientRequest originalRequest = new ClientRequest(KNOWN_ID, KNOWN_AMOUNT);
-        // A slightly different amount
         ClientRequest changedRequest = new ClientRequest(KNOWN_ID, KNOWN_AMOUNT + 1);
 
-        // When
+        // Numbers are calculated for both
         long originalNumber = verificationStrategy.calculate(originalRequest);
         long changedNumber = verificationStrategy.calculate(changedRequest);
 
-        // Then
-        // The new number must NOT be the same as the original, proving the Amount was used in the hash input.
+        // The new number must NOT be the same as the original
         assertNotEquals(originalNumber, changedNumber, "Changing the amount must change the verification number.");
     }
 }
