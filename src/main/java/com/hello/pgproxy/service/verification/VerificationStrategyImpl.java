@@ -12,6 +12,16 @@ import java.util.HexFormat;
 @Component
 @Slf4j
 public class VerificationStrategyImpl implements VerificationStrategy {
+    /**
+     * Computes the verification code required.
+     * 1. Iterates from verification_code = 0.
+     * 2. Hashes (id + amount + verification_code) using SHA-256.
+     * 3. Returns the code if the hash starts with "abcd".
+     *
+     * @param request Payment request.
+     * @return The computed verification number.
+     * @throws RuntimeException if the SHA-256 algorithm is not available.
+     */
     @Override
     public long calculate(ClientRequest request) {
         final String PREFIX = "abcd";

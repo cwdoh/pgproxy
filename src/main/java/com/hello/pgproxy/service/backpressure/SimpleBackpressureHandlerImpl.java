@@ -16,11 +16,13 @@ public class SimpleBackpressureHandlerImpl implements BackpressureHandler {
 
     @Override
     public int getScaleDownConcurrency(int concurrency) {
+        // Simply introduce 95% of current concurrency limit.
         return Math.max(1, (int)(concurrency * 0.95));
     }
 
     @Override
     public int getScaleUpConcurrency(int concurrency) {
+        // Scale up should be increased step by step for preventing too quick limit-touch.
         return Math.min(concurrency + 1, concurrencyProperties.getMax());
     }
 }

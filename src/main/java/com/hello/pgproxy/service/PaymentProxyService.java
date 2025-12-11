@@ -24,6 +24,17 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Service responsible for managing payment requests with a focus on revenue maximization.
+ * Prioritization:
+ * - Uses a {@link PriorityBlockingQueue} to order requests by {@link PrioritizedTask}
+ * - This ensures that high-value transactions are processed first
+ * Concurrency:
+ * - Acts as a buffer between the client and the backend.
+ * - This decoupling allows the proxy can handle traffic, effectively providing a backpressure strategy.
+ * Trade-off:
+ * - While enqueue() introduces a slight computational overhead, but this cost is negligible to achieve the goal.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,10 +44,15 @@ public class PaymentProxyService {
     private final ConcurrencyProperties  concurrencyProperties;
     private final List<BackpressureHandler> backpressureHandlers;
 
+    // Thread-safe queue that orders payment requests
     private final PriorityBlockingQueue<PrioritizedTask> queue = new PriorityBlockingQueue<>();
+
+    // Allocate the dedicate thread pool for cpu intensive works
     private final int availableCores = Runtime.getRuntime().availableProcessors();
     private final ExecutorService enqueueWorkPool = Executors.newFixedThreadPool(availableCores);
+    // Allocate the dedicate thread pool for I/O works
     private final ExecutorService backendWorkPool = Executors.newVirtualThreadPerTaskExecutor();
+    // Simple loop thead
     private final ExecutorService eventLookExecutor = Executors.newSingleThreadExecutor();
 
     private final Object monitor = new Object();
