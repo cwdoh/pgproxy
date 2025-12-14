@@ -84,7 +84,7 @@ class PriorityTaskQueueServiceTest {
         Thread.sleep(100);
 
         // The queue must contain exactly the number of submitted tasks
-        assertEquals(NUM_TASKS, priorityTaskQueueService.size(), "The queue must contain all tasks submitted concurrently.");
+        assertEquals(NUM_TASKS, priorityTaskQueueService.getRemainingTaskCount(), "The queue must contain all tasks submitted concurrently.");
     }
 
     @Test

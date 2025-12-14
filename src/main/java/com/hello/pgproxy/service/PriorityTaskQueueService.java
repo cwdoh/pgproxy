@@ -12,6 +12,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 
+/**
+ * Service responsible for queue of payment requests with a focus on revenue maximization.
+ * Prioritization:
+ * - Uses a {@link PriorityBlockingQueue} to order requests by {@link PrioritizedTask}
+ * - This ensures that higher-value request are processed first
+ * Trade-off:
+ * - While enqueue() introduces a slight computational overhead, but this cost is negligible to achieve the goal.
+ */
 @Service
 @RequiredArgsConstructor
 public class PriorityTaskQueueService {
@@ -45,7 +53,7 @@ public class PriorityTaskQueueService {
         return queue.take();
     }
 
-    public int size() {
+    public int getRemainingTaskCount() {
         return queue.size();
     }
 }
